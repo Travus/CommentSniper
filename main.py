@@ -1,27 +1,27 @@
 # CommentSniper created by Travus on Dec. 12th 2018
 
 from os import mkdir, path  # For checking if key files exists.
-from sys import exit  # For gracefull shutdown if crucial exception raised.
-from urllib import request, error as urllibError  # For interacting with YouTube API.
-from concurrent import futures  # For asynchonous API requests.
+from sys import exit  # For graceful shutdown if crucial exception raised.
+from urllib import request, error as urllib_error  # For interacting with YouTube API.
+from concurrent import futures  # For asynchronous API requests.
 import discord  # For using Discord as a user interface.
 from discord.ext import commands  # For using Discord as a user interface.
-import json  # For handlling responses from the YouTube API.
+import json  # For handling responses from the YouTube API.
 from datetime import datetime  # Used for error logging.
 import sqlite3  # Used to store special searches.
-from aiohttp import ClientConnectorError as CCE  # To detect connection errors.
+from aiohttp import ClientConnectorError as CCError  # To detect connection errors.
 
 
 class Comment:
     """Container for info about comment or reply, with potential list of replies if comment."""
 
-    def __init__(self, commentId, vidId, author, message, isReply=False, replies=0):
+    def __init__(self, comment_id, vid_id, author, message, is_reply=False, replies=0):
         """Initialization of comment class."""
-        self.id = commentId
-        self.vidId = vidId
+        self.id = comment_id
+        self.vidId = vid_id
         self.author = author
         self.message = message
-        if isReply:
+        if is_reply:
             self.kind = "reply"
         else:
             self.kind = "comment"
@@ -37,24 +37,24 @@ class Comment:
         return f"<https://www.youtube.com/watch?v={self.vidId}&lc={self.id}> ({self.kind})"
 
 
-def curTime():
+def cur_time():
     """Returns current date and time."""
     return str(datetime.utcnow())[0:16]
 
 
-def getKey(keyType):
+def get_key(key_type):
     """Imports a Discord token or YouTube key from file."""
     directory = None
     try:
-        if keyType == "discord":
-            keyType = "Discord token"
+        if key_type == "discord":
+            key_type = "Discord token"
             directory = "credentials/discord_token.txt"
-        elif keyType == "youtube":
-            keyType = "YouTube key"
+        elif key_type == "youtube":
+            key_type = "YouTube key"
             directory = "credentials/youtube_key.txt"
-        keyfile = open(directory, "r")
-        key = str(keyfile.read().strip())
-        keyfile.close()
+        key_file = open(directory, "r")
+        key = str(key_file.read().strip())
+        key_file.close()
         if len(key) == 0:
             raise FileNotFoundError
         else:
@@ -62,44 +62,44 @@ def getKey(keyType):
     except FileNotFoundError:
         if not path.isdir("credentials"):
             mkdir("credentials")
-        keyfile = open(directory, "w")
-        keyfile.close()
-        print(f"[{curTime()}] Error: Credentials not found. Place {keyType} in {directory}")
+        key_file = open(directory, "w")
+        key_file.close()
+        print(f"[{cur_time()}] Error: Credentials not found. Place {key_type} in {directory}")
         exit(1)
 
 
-async def getComments(videoId, comments, pageToken=None):
+async def get_comments(video_id, comments, page_token=None):
     """Populates 'comments' attribute (list) with comments and their replies."""
-    pageToken = "" if pageToken is None else f"&pageToken={pageToken}"
-    requestUrl = f"https://www.googleapis.com/youtube/v3/commentThreads?key={ytKey}&part=snippet&maxResults=100&videoId={videoId}{pageToken}"
-    with request.urlopen(requestUrl) as url:
-        response = url.read()
+    page_token = "" if page_token is None else f"&pageToken={page_token}"
+    request_url = f"https://www.googleapis.com/youtube/v3/commentThreads?key={ytKey}&part=snippet&maxResults=100&videoId={video_id}{page_token}"
+    with request.urlopen(request_url) as req_url:
+        response = req_url.read()
     response = json.loads(response)
     for comment in response['items']:
-        comments.append(Comment(comment['id'], videoId, comment['snippet']['topLevelComment']['snippet']['authorDisplayName'],
+        comments.append(Comment(comment['id'], video_id, comment['snippet']['topLevelComment']['snippet']['authorDisplayName'],
                                 comment['snippet']['topLevelComment']['snippet']['textOriginal'], False, comment['snippet']['totalReplyCount']))
     if "nextPageToken" in response:
-        await getComments(videoId, comments, response['nextPageToken'])
+        await get_comments(video_id, comments, response['nextPageToken'])
     else:
         with futures.ThreadPoolExecutor() as executor:
-            [executor.submit(getReplies, com) for com in comments if com.replyAmount > 0]
+            [executor.submit(get_replies, com) for com in comments if com.replyAmount > 0]
 
 
-def getReplies(comment, pageToken=None):
+def get_replies(comment, page_token=None):
     """Used by 'getComments' function to find replies to top-level comments."""
-    pageToken = "" if pageToken is None else f"&pageToken={pageToken}"
-    requestUrl = f"https://www.googleapis.com/youtube/v3/comments?key={ytKey}&part=snippet&maxResults=100&parentId={comment.id}{pageToken}"
-    with request.urlopen(requestUrl) as url:
-        response = url.read()
+    page_token = "" if page_token is None else f"&pageToken={page_token}"
+    request_url = f"https://www.googleapis.com/youtube/v3/comments?key={ytKey}&part=snippet&maxResults=100&parentId={comment.id}{page_token}"
+    with request.urlopen(request_url) as req_url:
+        response = req_url.read()
     response = json.loads(response)
     for reply in response['items']:
         comment.replies.append(Comment(reply['id'], comment.vidId, reply['snippet']['authorDisplayName'], reply['snippet']['textOriginal'], True))
     if "nextPageToken" in response:
-        getReplies(comment, response['nextPageToken'])
+        get_replies(comment, response['nextPageToken'])
 
 
-def filterUser(comments, user):
-    """Returns list of comments and replies fltered by author name."""
+def filter_user(comments, user):
+    """Returns list of comments and replies filtered by author name."""
     results = []
     for comment in comments:
         if comment.author.lower() == user.lower():
@@ -112,7 +112,7 @@ def filterUser(comments, user):
     return results
 
 
-def filterPhrase(comments, phrase):
+def filter_phrase(comments, phrase):
     """Returns list of comments and replies filtered by substring."""
     results = []
     for comment in comments:
@@ -126,14 +126,14 @@ def filterPhrase(comments, phrase):
     return results
 
 
-def listFilter(comments, phrases):
+def list_filter(comments, phrases):
     """Returns nested lists of comments and replies filtered by multiple substrings and the corresponding substring."""
     results = []
     final = []
     for filterWord in phrases:
-        partResults = filterPhrase(comments, filterWord)
-        if partResults is not None:
-            for part in partResults:
+        part_results = filter_phrase(comments, filterWord)
+        if part_results is not None:
+            for part in part_results:
                 if part not in results:
                     results.append(part)
                     final.append([part, " (" + str(filterWord) + ")"])
@@ -142,7 +142,7 @@ def listFilter(comments, phrases):
     return final
 
 
-async def sendResultMessage(ctx, results, search):
+async def send_result_message(ctx, results, search):
     """Sends result messages grouped by 10 results per message."""
     n = 0
     message = f"Results for {search}:"
@@ -162,21 +162,21 @@ async def sendResultMessage(ctx, results, search):
         await send(ctx, f"No result matches the {search}.")
 
 
-async def validate(ctx, videoId):
+async def validate(ctx, video_id):
     """Validates if videoId is valid and request goes through."""
-    requestUrl = f"https://www.googleapis.com/youtube/v3/videos?key={ytKey}&part=id&id={videoId}"
+    request_url = f"https://www.googleapis.com/youtube/v3/videos?key={ytKey}&part=id&id={video_id}"
     try:
-        with request.urlopen(requestUrl) as url:
-            response = url.read()
+        with request.urlopen(request_url) as req_url:
+            response = req_url.read()
         if json.loads(response)['pageInfo']['totalResults'] == 0:
-            print(f"[{curTime()}] {ctx.message.author.id}: Video not found. The supplied VideoID is invalid.")
+            print(f"[{cur_time()}] {ctx.message.author.id}: Video not found. The supplied VideoID is invalid.")
             await send(ctx, "Video not found. The supplied VideoID is invalid.")
             return 0
         else:
             return 1
-    except urllibError.HTTPError as e:
-        if e.code == 400:
-            print(f"[{curTime()}] {ctx.message.author.id}: Request failed. Daily YouTube quota likely exceeded.")
+    except urllib_error.HTTPError as ex:
+        if ex.code == 400:
+            print(f"[{cur_time()}] {ctx.message.author.id}: Request failed. Daily YouTube quota likely exceeded.")
             await send(ctx, "Request failed. Daily YouTube quota likely exceeded.")
             return 0
 
@@ -185,25 +185,25 @@ async def send(ctx, message):
     """Sends a message and tries to handle connection issues."""
     try:
         await ctx.send(message)
-    except CCE:
+    except CCError:
         try:
             await ctx.send(message)
-        except CCE:
-            print(f"[{curTime()}] {ctx.message.author.id}: Encountered client connection error. Could not resend message.")
+        except CCError:
+            print(f"[{cur_time()}] {ctx.message.author.id}: Encountered client connection error. Could not resend message.")
             await ctx.send("Client connection error. Failed to send and resend message. Please try again.")
 
 
-async def delCommand(msg):
+async def del_command(msg):
     """Tries to delete a message based on server preferences, logs failures."""
     db.execute("SELECT * FROM serverSettings WHERE serverId = ? AND deleteMessages = 1", (msg.guild.id, ))
     if db.fetchone():
         try:
             await msg.message.delete()
         except discord.Forbidden:
-            print(f"[{curTime()}] {msg.message.author.id}: Bot does not have required permissions to delete message.")
+            print(f"[{cur_time()}] {msg.message.author.id}: Bot does not have required permissions to delete message.")
 
 
-def createDB():
+def create_db():
     """Establishes database if it is not already set up."""
     db.execute("CREATE TABLE IF NOT EXISTS customSearches(serverId INTEGER NOT NULL, searchName TEXT NOT NULL , searchId INTEGER DEFAULT 0 NOT NULL, PRIMARY KEY (serverId, searchName))")
     db.execute("CREATE TABLE IF NOT EXISTS searchTerms(searchId INTEGER NOT NULL, term TEXT NOT NULL, PRIMARY KEY (searchId, term))")
@@ -212,35 +212,35 @@ def createDB():
     db.execute("CREATE TRIGGER IF NOT EXISTS delTerms AFTER DELETE ON customSearches BEGIN DELETE FROM searchTerms WHERE searchTerms.searchId = OLD.searchId; END;")
 
 
-async def checkIfExists(ctx, targetSearch, targetTerm=None, errorOnSearch=None, errorOnTerm=None):
+async def check_if_exists(ctx, target_search, target_term=None, error_on_search=None, error_on_term=None):
     """Verifies if search or term exists, returns search ID and handles error messages."""
-    db.execute("SELECT searchId FROM customSearches WHERE serverId = ? AND searchName = ?", (ctx.guild.id, targetSearch.lower()))
-    searchId = db.fetchone()
-    if searchId is None:
-        if errorOnSearch == 0:
+    db.execute("SELECT searchId FROM customSearches WHERE serverId = ? AND searchName = ?", (ctx.guild.id, target_search.lower()))
+    search_id = db.fetchone()
+    if search_id is None:
+        if error_on_search == 0:
             await send(ctx, "No custom search with this name exists on this server.")
         return False, None
-    elif targetTerm is None:
-        if errorOnSearch == 1:
+    elif target_term is None:
+        if error_on_search == 1:
             await send(ctx, "A custom search with this name already exists on this server.")
-        return searchId[0], None
+        return search_id[0], None
     else:
-        db.execute("SELECT COUNT(*) FROM searchTerms WHERE searchId = ? AND term = ?", (searchId[0], targetTerm.lower()))
+        db.execute("SELECT COUNT(*) FROM searchTerms WHERE searchId = ? AND term = ?", (search_id[0], target_term.lower()))
         if db.fetchone()[0]:
-            if errorOnTerm == 1:
+            if error_on_term == 1:
                 await send(ctx, "The term is already part of the custom search.")
-            return searchId[0], True
+            return search_id[0], True
         else:
-            if errorOnTerm == 0:
+            if error_on_term == 0:
                 await send(ctx, "No such term is part of this custom search.")
-            return searchId[0], False
+            return search_id[0], False
 
 
-dbcon = sqlite3.connect("database.db")  # Create sqlite3 databse connection (Creates database file if not found.)
-db = dbcon.cursor()  # Create sqlite3 databse cursor.
-createDB()
-ytKey = getKey("youtube")
-dKey = getKey("discord")
+dbcon = sqlite3.connect("database.db")  # Create sqlite3 database connection (Creates database file if not found.)
+db = dbcon.cursor()  # Create sqlite3 database cursor.
+create_db()
+ytKey = get_key("youtube")
+dKey = get_key("discord")
 bot = commands.Bot(command_prefix="!")  # Set command prefix.
 bot.remove_command("help")  # Remove ugly inbuilt help command.
 
@@ -252,19 +252,19 @@ async def on_ready():
 
 
 @bot.command(name="help")
-async def helpCommand(ctx, *, additional=None):
+async def help_command(ctx, *, additional=None):
     """Help command describing syntax and usage."""
     if ctx.guild is not None:
-        await delCommand(ctx)
+        await del_command(ctx)
         if additional is None or additional.lower() != "custom":
             await send(ctx, """Info:
-        This bot allows you to scan all the comments and replies of a YouTube video for spesific users, phrases, or a list of phrases.
+        This bot allows you to scan all the comments and replies of a YouTube video for specific users, phrases, or a list of phrases.
         You can find video IDs in the video URL. It starts after ``v=`` and ends before a ``&`` character, if there is one.
         An example of this would be ``https://www.youtube.com/watch?v=AAAAAA&list=BBBBBBBBBBBBBB`` where AAAAAA would be the ID.""")
             await send(ctx, """Commands:
-        ``!usersearch <videoId> <userName>``          Search video for comments and replies made by spesific user.
-        ``!phrasesearch <videoId> <searchPhrase>``          Search video for comments and replies containing spesific phrase.
-        ``!listsearch <videoId> <term1||term2||term3||...>``          Search video for comments and replies in a || seperated list.
+        ``!usersearch <videoId> <userName>``          Search video for comments and replies made by specific user.
+        ``!phrasesearch <videoId> <searchPhrase>``          Search video for comments and replies containing specific phrase.
+        ``!listsearch <videoId> <term1::term2::term3::...>``          Search video for comments and replies in a || specific list.
         ``!toggledelete <on/off>``          Chooses whether the bot deletes commands or not. Requires manage server permission.
         
 Use ``!help custom`` for info on custom searches.
@@ -301,14 +301,14 @@ async def toggeldelete(ctx, state=None):
                 await send(ctx, "Server message deletion state set.")
             else:
                 await send(ctx, "You need the ``manage server`` permission to change this bot's settings for this server.")
-        await delCommand(ctx)
+        await del_command(ctx)
 
 
 @bot.command(name="customsearches")
 async def customsearches(ctx, op=None, name=None, *, term=None):
     """List custom searches and terms saved to them. Add new and delete custom searches, and add or remove terms from them."""
-    if ctx.guild is not None:
-        await delCommand(ctx)
+    if ctx.guild:
+        await del_command(ctx)
         perms = ctx.message.author.permissions_in(ctx.message.channel)
         if op is None or op.lower() not in ["list", "new", "delete", "addterm", "removeterm"]:
             await send(ctx, "Invalid syntax. Correct syntax is ``!customsearches <list/new/delete/addterm/removeterm> [name] [term]``")
@@ -323,7 +323,7 @@ async def customsearches(ctx, op=None, name=None, *, term=None):
             else:
                 await send(ctx, "There are no custom searches on this server.")
         elif op.lower() == "list" and name is not None:
-            results = await checkIfExists(ctx, name, None, 0)
+            results = await check_if_exists(ctx, name, None, 0)
             if results[0]:
                 db.execute("SELECT term FROM searchTerms WHERE searchId = ?", (results[0], ))
                 terms = [str(row[0]) for row in db.fetchall()]
@@ -360,7 +360,7 @@ async def customsearches(ctx, op=None, name=None, *, term=None):
             if name is None:
                 await send(ctx, "Invalid syntax. Correct syntax is ``!customsearches delete <name>``")
             else:
-                results = await checkIfExists(ctx, name, None, 0, None)
+                results = await check_if_exists(ctx, name, None, 0, None)
                 if results[0]:
                     db.execute("DELETE FROM customSearches WHERE serverId = ? AND searchName = ?", (ctx.guild.id, name.lower()))
                     dbcon.commit()
@@ -369,7 +369,7 @@ async def customsearches(ctx, op=None, name=None, *, term=None):
             if name is None or term is None:
                 await send(ctx, "Invalid syntax. Correct syntax is ``!customsearches addterm <name> <term>``")
             elif len(name) <= 80:
-                results = await checkIfExists(ctx, name, term, 0, 1)
+                results = await check_if_exists(ctx, name, term, 0, 1)
                 if results[0] and not results[1]:
                     db.execute("INSERT INTO searchTerms(searchId, term) VALUES (?, ?)", (results[0], term.lower()))
                     dbcon.commit()
@@ -380,7 +380,7 @@ async def customsearches(ctx, op=None, name=None, *, term=None):
             if name is None or term is None:
                 await send(ctx, "Invalid syntax. Correct syntax is ``!customsearches removeterm <name> <term>``")
             else:
-                results = await checkIfExists(ctx, name, term, 0, 0)
+                results = await check_if_exists(ctx, name, term, 0, 0)
                 if results[0] and results[1]:
                     db.execute("DELETE FROM searchTerms WHERE searchId = ? AND term = ?", (results[0], term.lower()))
                     dbcon.commit()
@@ -390,107 +390,105 @@ async def customsearches(ctx, op=None, name=None, *, term=None):
 
 
 @bot.command(name="usersearch")
-async def usersearch(ctx, videoId=None, *, user=None):
+async def usersearch(ctx, video_id=None, *, user=None):
     """Search video for comments and replies by user."""
-    if ctx.guild is not None:
-        await delCommand(ctx)
-        if videoId is None or user is None:
+    if ctx.guild:
+        await del_command(ctx)
+        if video_id is None or user is None:
             await send(ctx, "Invalid syntax. Correct syntax is ``!usersearch <videoId> <userName>``.")
-        elif await validate(ctx, videoId):
+        elif await validate(ctx, video_id):
             if len(user) <= 80:
                 comments = []
-                await getComments(videoId, comments)
-                await sendResultMessage(ctx, filterUser(comments, user), f"user search '{user}'")
+                await get_comments(video_id, comments)
+                await send_result_message(ctx, filter_user(comments, user), f"user search '{user}'")
             else:
                 await send(ctx, "user names cannot be more than 80 characters long.")
 
 
 @bot.command(name="phrasesearch")
-async def phrasesearch(ctx, videoId=None, *, phrase=None):
+async def phrasesearch(ctx, video_id=None, *, phrase=None):
     """Search video for comments and replies by substring."""
-    if ctx.guild is not None:
-        await delCommand(ctx)
-        if videoId is None or phrase is None:
+    if ctx.guild:
+        await del_command(ctx)
+        if video_id is None or phrase is None:
             await send(ctx, "Invalid syntax. Correct syntax is ``!phrasesearch <videoId> <searchPhrase>``.")
-        elif await validate(ctx, videoId):
+        elif await validate(ctx, video_id):
             if len(phrase) <= 80:
                 comments = []
-                await getComments(videoId, comments)
-                await sendResultMessage(ctx, filterPhrase(comments, phrase), f"phrase search '{phrase}'")
+                await get_comments(video_id, comments)
+                await send_result_message(ctx, filter_phrase(comments, phrase), f"phrase search '{phrase}'")
             else:
                 await send(ctx, "Search phrases cannot be more than 80 characters long.")
 
 
 @bot.command(name="customsearch")
-async def customsearch(ctx, videoId=None, search=None):
+async def customsearch(ctx, video_id=None, search=None):
     """Search video for comments and replies for substrings saved to custom search."""
-    if ctx.guild is not None:
-        await delCommand(ctx)
-        if videoId is None or search is None:
+    if ctx.guild:
+        await del_command(ctx)
+        if video_id is None or search is None:
             await send(ctx, "Invalid syntax. Correct syntax is ``!customsearch <videoId> <searchName>``.")
-        elif await validate(ctx, videoId):
-            results = await checkIfExists(ctx, search, None, 0, None)
+        elif await validate(ctx, video_id):
+            results = await check_if_exists(ctx, search, None, 0, None)
             if results[0]:
                 db.execute("SELECT term FROM searchTerms WHERE searchId = ?", (results[0], ))
                 results = [result[0] for result in reversed(db.fetchall())]
                 if results:
                     comments = []
-                    await getComments(videoId, comments)
-                    await sendResultMessage(ctx, listFilter(comments, results), f"custom search '{search}'")
+                    await get_comments(video_id, comments)
+                    await send_result_message(ctx, list_filter(comments, results), f"custom search '{search}'")
                 else:
                     await send(ctx, "The search has no search terms associated with it.")
 
 
 @bot.command(name="listsearch")
-async def listsearch(ctx, videoId=None, *, terms=None):
-    """Search video for comments and replies by list of sbstrings."""
-    if ctx.guild is not None:
-        await delCommand(ctx)
-        if videoId is None or terms is None:
-            await send(ctx, "Invalid syntax. Correct syntax is ``!listsearch <videoId> <term1||term2||term3||...>``.")
-        elif await validate(ctx, videoId):
-            terms = [term for term in terms.split("||") if term not in ["", " "]]
-            termAmount = len(terms)
+async def listsearch(ctx, video_id=None, *, terms=None):
+    """Search video for comments and replies by list of substrings."""
+    if ctx.guild:
+        await del_command(ctx)
+        if video_id is None or terms is None:
+            await send(ctx, "Invalid syntax. Correct syntax is ``!listsearch <videoId> <term1::term2::term3::...>``.")
+        elif await validate(ctx, video_id):
+            terms = [term for term in terms.split("::") if term not in ["", " "]]
+            term_amount = len(terms)
             terms = [term for term in terms if len(term) <= 80]
-            if termAmount > len(terms):
+            if term_amount > len(terms):
                 await send(ctx, "Search-terms cannot be more than 80 characters long, too long terms have been removed from search.")
             if terms:
                 comments = []
-                await getComments(videoId, comments)
-                await sendResultMessage(ctx, listFilter(comments, terms), "list search")
-            elif termAmount:
+                await get_comments(video_id, comments)
+                await send_result_message(ctx, list_filter(comments, terms), "list search")
+            elif term_amount:
                 await send(ctx, "No search terms left after removing search terms over 80 characters long.")
             else:
-                await send(ctx, "Invalid syntax. Correct syntax is ``!listsearch <videoId> <term1||term2||term3||...>``.")
+                await send(ctx, "Invalid syntax. Correct syntax is ``!listsearch <videoId> <term1::term2::term3::...>``.")
 
 
 @bot.event
 async def on_command_error(ctx, error):
-    """Logs errors, maily used to log invalid commands."""
-    print(f"[{curTime()}] {ctx.message.author.id}: {error}")
-
-
-# [2019-01-03 20:59] 256237456926441476: Command raised an exception: ClientConnectorError: Cannot connect to host discordapp.com:443 ssl:None [getaddrinfo failed]
+    """Logs errors, mainly used to log invalid commands."""
+    if ctx.guild:
+        print(f"[{cur_time()}] {ctx.message.author.id}: {error}")
 
 
 try:  # Make test YouTube request and run the bot.
     with request.urlopen(f"https://www.googleapis.com/youtube/v3/videos?key={ytKey}&part=id&id=IOzpF_xeOSw") as url:
         url.read()
     bot.run(dKey)
-except urllibError.HTTPError as e:  # YouTube request failed, likely invalid key. Gracefull shutdown.
+except urllib_error.HTTPError as e:  # YouTube request failed, likely invalid key. Graceful shutdown.
     if e.code == 400:
-        print(f"[{curTime()}] Error: Request failed. YouTube key is likely invalid.")
+        print(f"[{cur_time()}] Error: Request failed. YouTube key is likely invalid.")
         exit(2)
     else:
         raise
-except discord.errors.LoginFailure:  # Bot login failure, likely invalid token. Gracefull shutdown.
-    print(f"[{curTime()}] Error: Login failed. Discord token is likely invalid.")
+except discord.errors.LoginFailure:  # Bot login failure, likely invalid token. Graceful shutdown.
+    print(f"[{cur_time()}] Error: Login failed. Discord token is likely invalid.")
     exit(2)
 finally:
     db.close()  # Close sqlite3 database cursor.
-    dbcon.close()  # Close sqlite3 databse connection.
+    dbcon.close()  # Close sqlite3 database connection.
 
 
 # Error Codes:
-# 1 - Missing creditentials.
-# 2 - Creditentials likely invalid.
+# 1 - Missing credentials.
+# 2 - Credentials likely invalid.

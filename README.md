@@ -27,8 +27,8 @@ Searches the video's comment section for comments and replies made by the user w
 `!phrasesearch <videoId> <phrase>`<br>
 Searches the video's comment section for comments and replies that contain a certain phrase. A phrase is not case sensitive and can be any text or word of 80 characters or shorter. Returns links to all comments or replies that match the search, and notes if they are comments or replies.
 
-`!listsearch <videoId> <term1||term2||term3||...>`<br>
-Functions identical to the phrase search, except it takes a `||` (Two pipe symbols.) separated list of phrases and returns results matching at least one of the phrases in the list. Results note which term they matched with in addition to if it is a comment or a reply. If multiple terms match, it will display the first one that matched, no duplicated will be shown.
+`!listsearch <videoId> <term1::term2::term3::...>`<br>
+Functions identical to the phrase search, except it takes a `::` (Two colon symbols.) separated list of phrases and returns results matching at least one of the phrases in the list. Results note which term they matched with in addition to if it is a comment or a reply. If multiple terms match, it will display the first one that matched, no duplicated will be shown.
 
 `!customsearch <videoId> <searchName>`<br>
 Functions identical to a list search, except it uses the terms saved to the custom search as terms rather than asking the user for them. This is intended to be used for frequent terms to spare users the need to save the list search elsewhere and enables multiple users to execute the same search without having to share their terms.
@@ -49,11 +49,11 @@ Deletes the specified custom search along with any terms that were saved to it.
 Saves a search term to the specified custom search. Search terms are not case sensitive and can be no longer than 80 characters.
 
 `!customsearches removeterm <searchName> <term>`<br>
-Removes a searchterm from the spesified custom search.
+Removes a search term from the specified custom search.
 
 ### Prerequisites
 
-Comment Sniper requires [Python 3.6](https://www.python.org/) or above aswell as [discord.py rewrite 1.0.0a](https://github.com/Rapptz/discord.py/tree/rewrite) by Rapptz.
+Comment Sniper requires [Python 3.6](https://www.python.org/) or above as well as [discord.py rewrite 1.0.0a](https://github.com/Rapptz/discord.py/tree/rewrite) by Rapptz.
 To install the correct version of discord.py use:
 ```
 pip install -U git+https://github.com/Rapptz/discord.py@rewrite#egg=discord.py
