@@ -164,6 +164,11 @@ async def send_result_message(ctx, results, search):
 
 async def validate(ctx, video_id):
     """Validates if videoId is valid and request goes through."""
+    if "?v=" in video_id:
+        video_id = video_id.strip(">").strip("<")
+        video_id = video_id[video_id.find('?v=') + 3:]
+        if "&" in video_id:
+            video_id = video_id[:video_id.find('&')]
     request_url = f"https://www.googleapis.com/youtube/v3/videos?key={ytKey}&part=id&id={video_id}"
     try:
         with request.urlopen(request_url) as req_url:
@@ -173,7 +178,7 @@ async def validate(ctx, video_id):
             await send(ctx, "Video not found. The supplied VideoID is invalid.")
             return 0
         else:
-            return 1
+            return video_id
     except urllib_error.HTTPError as ex:
         if ex.code == 400:
             print(f"[{cur_time()}] {ctx.message.author.id}: Request failed. Daily YouTube quota likely exceeded.")
@@ -260,18 +265,19 @@ async def help_command(ctx, *, additional=None):
             await send(ctx, """Info:
         This bot allows you to scan all the comments and replies of a YouTube video for specific users, phrases, or a list of phrases.
         You can find video IDs in the video URL. It starts after ``v=`` and ends before a ``&`` character, if there is one.
-        An example of this would be ``https://www.youtube.com/watch?v=AAAAAA&list=BBBBBBBBBBBBBB`` where AAAAAA would be the ID.""")
+        An example of this would be ``https://www.youtube.com/watch?v=AAAAAA&list=BBBBBBBBBBBBBB`` where AAAAAA would be the ID.
+        You can now also use links instead o video IDs.""")
             await send(ctx, """Commands:
-        ``!usersearch <videoId> <userName>``          Search video for comments and replies made by specific user.
-        ``!phrasesearch <videoId> <searchPhrase>``          Search video for comments and replies containing specific phrase.
-        ``!listsearch <videoId> <term1::term2::term3::...>``          Search video for comments and replies in a || specific list.
+        ``!usersearch <videoId/link> <userName>``          Search video for comments and replies made by specific user.
+        ``!phrasesearch <videoId/link> <searchPhrase>``          Search video for comments and replies containing specific phrase.
+        ``!listsearch <videoId/link> <term1::term2::term3::...>``          Search video for comments and replies in a || specific list.
         ``!toggledelete <on/off>``          Chooses whether the bot deletes commands or not. Requires manage server permission.
         
 Use ``!help custom`` for info on custom searches.
         """)
         else:
             await send(ctx, """Custom search info:
-        ``!customsearch <videoId> <searchName>``          Search video for comments and replies containing terms associated with a custom search.
+        ``!customsearch <videoId/link> <searchName>``          Search video for comments and replies containing terms associated with a custom search.
 
         ``!customsearches list``          List all custom searches on the server.
         ``!customsearches list <name>``          List all terms associated with a custom search.
@@ -396,7 +402,8 @@ async def usersearch(ctx, video_id=None, *, user=None):
         await del_command(ctx)
         if video_id is None or user is None:
             await send(ctx, "Invalid syntax. Correct syntax is ``!usersearch <videoId> <userName>``.")
-        elif await validate(ctx, video_id):
+        video_id = await validate(ctx, video_id)
+        if video_id:
             if len(user) <= 80:
                 comments = []
                 await get_comments(video_id, comments)
@@ -412,7 +419,8 @@ async def phrasesearch(ctx, video_id=None, *, phrase=None):
         await del_command(ctx)
         if video_id is None or phrase is None:
             await send(ctx, "Invalid syntax. Correct syntax is ``!phrasesearch <videoId> <searchPhrase>``.")
-        elif await validate(ctx, video_id):
+        video_id = await validate(ctx, video_id)
+        if video_id:
             if len(phrase) <= 80:
                 comments = []
                 await get_comments(video_id, comments)
@@ -428,7 +436,8 @@ async def customsearch(ctx, video_id=None, search=None):
         await del_command(ctx)
         if video_id is None or search is None:
             await send(ctx, "Invalid syntax. Correct syntax is ``!customsearch <videoId> <searchName>``.")
-        elif await validate(ctx, video_id):
+        video_id = await validate(ctx, video_id)
+        if video_id:
             results = await check_if_exists(ctx, search, None, 0, None)
             if results[0]:
                 db.execute("SELECT term FROM searchTerms WHERE searchId = ?", (results[0], ))
@@ -448,7 +457,8 @@ async def listsearch(ctx, video_id=None, *, terms=None):
         await del_command(ctx)
         if video_id is None or terms is None:
             await send(ctx, "Invalid syntax. Correct syntax is ``!listsearch <videoId> <term1::term2::term3::...>``.")
-        elif await validate(ctx, video_id):
+        video_id = await validate(ctx, video_id)
+        if video_id:
             terms = [term for term in terms.split("::") if term not in ["", " "]]
             term_amount = len(terms)
             terms = [term for term in terms if len(term) <= 80]

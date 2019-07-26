@@ -13,7 +13,7 @@ Comment Sniper is a way to scan whole comment sections for comments and replies.
 <br>
 
 ### Usage
-Once the bot is properly set up and has joined a Discord server it is ready to receive and execute commands to scan comment sections. In order to scan a comment section, you will need the video's ID. Video IDs can easily be found in the video URL, starting after `v=` and ending before the first following `&` sign, if there is one.
+Once the bot is properly set up and has joined a Discord server it is ready to receive and execute commands to scan comment sections. In order to scan a comment section, you will need the video's ID. Video IDs can easily be found in the video URL, starting after `v=` and ending before the first following `&` sign, if there is one. You can also use a link instead and let the bot find ther ID if you so choose.
 
 `!help` & `!help custom`<br>
 Help commands that show information on regular commands and commands associated with custom searches respectively.
@@ -21,16 +21,16 @@ Help commands that show information on regular commands and commands associated 
 `!toggledelete <on/off>`<br>
 Toggles whether the command messages should be deleted once detected by the bot or not. Remembers setting per server. If no value is set on a server it will not remove the commands per default. Changing this setting requires the `Manage Server` permission on the server.
 
-`!usersearch <videoId> <user>`<br>
+`!usersearch <videoId/link> <user>`<br>
 Searches the video's comment section for comments and replies made by the user with the specified name. The username is not case sensitive. Returns links to all comments or replies that match the search, and notes if they are comments or replies.
 
-`!phrasesearch <videoId> <phrase>`<br>
+`!phrasesearch <videoId/link> <phrase>`<br>
 Searches the video's comment section for comments and replies that contain a certain phrase. A phrase is not case sensitive and can be any text or word of 80 characters or shorter. Returns links to all comments or replies that match the search, and notes if they are comments or replies.
 
-`!listsearch <videoId> <term1::term2::term3::...>`<br>
+`!listsearch <videoId/link> <term1::term2::term3::...>`<br>
 Functions identical to the phrase search, except it takes a `::` (Two colon symbols.) separated list of phrases and returns results matching at least one of the phrases in the list. Results note which term they matched with in addition to if it is a comment or a reply. If multiple terms match, it will display the first one that matched, no duplicated will be shown.
 
-`!customsearch <videoId> <searchName>`<br>
+`!customsearch <videoId/link> <searchName>`<br>
 Functions identical to a list search, except it uses the terms saved to the custom search as terms rather than asking the user for them. This is intended to be used for frequent terms to spare users the need to save the list search elsewhere and enables multiple users to execute the same search without having to share their terms.
 
 `!customsearches list`<br>
